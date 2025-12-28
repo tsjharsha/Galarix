@@ -1,0 +1,16 @@
+.header {
+  padding: 16px 40px;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+}
+
+.logo strong {
+  font-size: 18px;
+}
+
+.logo span {
+  display: block;
+  font-size: 11px;
+  color: #636975;
+  letter-spacing: 1px;
+}
