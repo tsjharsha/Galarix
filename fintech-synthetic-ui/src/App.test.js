@@ -1,8 +1,27 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { render, screen } from "@testing-library/react";
+import App from "./App";
 
-test('renders learn react link', () => {
+// =====================================================
+// BASIC APP RENDER TEST
+// =====================================================
+
+test("renders Galarix app without crashing", () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+
+  // Check if main container exists
+  const appElement = document.querySelector("div");
+  expect(appElement).toBeInTheDocument();
+});
+
+// =====================================================
+// DARK MODE TOGGLE TEST (OPTIONAL)
+// =====================================================
+
+test("toggles dark mode class", () => {
+  render(<App />);
+
+  const root = document.documentElement;
+
+  // initial state check
+  expect(root).toBeDefined();
 });

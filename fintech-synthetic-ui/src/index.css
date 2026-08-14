@@ -1,4 +1,463 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* =====================================================
+   GLOBAL RESET + BASE
+===================================================== */
+html, body {
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =====================================================
+   SCROLLBAR (PREMIUM)
+===================================================== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.3);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.5);
+}
+
+/* =====================================================
+   SELECTION
+===================================================== */
+::selection {
+  background: rgba(99, 102, 241, 0.25);
+  color: inherit;
+}
+
+/* =====================================================
+   GLASSMORPHISM
+===================================================== */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.dark .glass {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.glass-heavy {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+.dark .glass-heavy {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+/* =====================================================
+   GRADIENT BORDER EFFECT
+===================================================== */
+.gradient-border {
+  position: relative;
+  border-radius: 1rem;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4, #6366f1);
+  background-size: 300% 300%;
+  animation: gradient 8s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* =====================================================
+   ANIMATED GRADIENT BACKGROUND (LOGIN)
+===================================================== */
+.bg-mesh {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 50%);
+}
+.dark .bg-mesh {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.06) 0%, transparent 50%);
+}
+
+/* =====================================================
+   PREMIUM BUTTONS
+===================================================== */
+.btn-primary {
+  @apply px-5 py-2.5 rounded-xl font-semibold text-sm text-white
+    bg-gradient-to-r from-brand-500 to-brand-600
+    hover:from-brand-600 hover:to-brand-700
+    shadow-lg shadow-brand-500/25
+    transition-all duration-200
+    active:scale-[0.98];
+}
+
+.btn-ghost {
+  @apply px-4 py-2 rounded-xl font-medium text-sm
+    text-slate-600 dark:text-slate-300
+    hover:bg-slate-100 dark:hover:bg-slate-800
+    transition-all duration-200;
+}
+
+.btn-outline {
+  @apply px-4 py-2 rounded-xl font-medium text-sm
+    text-brand-600 dark:text-brand-400
+    border border-brand-300 dark:border-brand-500/30
+    hover:bg-brand-50 dark:hover:bg-brand-500/10
+    transition-all duration-200;
+}
+
+/* =====================================================
+   CARD STYLES
+===================================================== */
+.card {
+  @apply rounded-2xl border border-slate-200 dark:border-slate-700/50
+    bg-white dark:bg-slate-800/50
+    shadow-sm;
+}
+
+.card-glow {
+  @apply rounded-2xl border border-brand-200/50 dark:border-brand-500/20
+    bg-white dark:bg-slate-800/50;
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.06);
+}
+.dark .card-glow {
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.08);
+}
+
+.card-hover {
+  @apply rounded-2xl border border-slate-200 dark:border-slate-700/50
+    bg-white dark:bg-slate-800/50 shadow-sm
+    transition-all duration-300;
+}
+.card-hover:hover {
+  @apply border-brand-300 dark:border-brand-500/30 shadow-md;
+  transform: translateY(-2px);
+}
+
+/* =====================================================
+   STAT BADGES
+===================================================== */
+.badge-normal { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
+.badge-lognormal { @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400; }
+.badge-student-t { @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
+.badge-cauchy { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+.badge-categorical { @apply bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400; }
+.badge-beta { @apply bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400; }
+
+/* =====================================================
+   MORPHING ALERT BANNER
+===================================================== */
+.morphing-alert {
+  background: linear-gradient(135deg,
+    rgba(239, 68, 68, 0.1) 0%,
+    rgba(245, 158, 11, 0.1) 50%,
+    rgba(239, 68, 68, 0.1) 100%
+  );
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.dark .morphing-alert {
+  background: linear-gradient(135deg,
+    rgba(239, 68, 68, 0.08) 0%,
+    rgba(245, 158, 11, 0.08) 50%,
+    rgba(239, 68, 68, 0.08) 100%
+  );
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* =====================================================
+   QUALITY SCORE RING
+===================================================== */
+.quality-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.quality-ring svg {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+/* =====================================================
+   TAB SYSTEM
+===================================================== */
+.tab-active {
+  @apply text-brand-600 dark:text-brand-400 border-b-2 border-brand-500;
+}
+.tab-inactive {
+  @apply text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200;
+}
+
+/* =====================================================
+   AUDIT SCORE BADGES
+===================================================== */
+.audit-pass {
+  @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400
+    border border-emerald-200 dark:border-emerald-800/50;
+}
+.audit-warn {
+  @apply bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400
+    border border-amber-200 dark:border-amber-800/50;
+}
+.audit-fail {
+  @apply bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400
+    border border-red-200 dark:border-red-800/50;
+}
+
+/* =====================================================
+   STAT CARD (Dashboard Metrics)
+===================================================== */
+.stat-card {
+  @apply rounded-2xl p-5 flex flex-col items-center justify-center
+    border border-slate-200 dark:border-slate-700/50
+    bg-white dark:bg-slate-800/50
+    transition-all duration-300;
+}
+.stat-card:hover {
+  @apply border-brand-300 dark:border-brand-500/30;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.08);
+}
+.stat-card .stat-value {
+  @apply text-3xl font-extrabold tracking-tight;
+}
+.stat-card .stat-label {
+  @apply text-[10px] font-semibold text-slate-500 dark:text-slate-400
+    uppercase tracking-widest mt-1.5;
+}
+
+/* =====================================================
+   REGION BADGE
+===================================================== */
+.region-badge {
+  @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+    text-xs font-semibold
+    border transition-all duration-200;
+}
+.region-badge-active {
+  @apply bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-400
+    border-brand-200 dark:border-brand-500/30;
+}
+
+/* =====================================================
+   ENTITY CATEGORY PILLS
+===================================================== */
+.entity-pill {
+  @apply flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium
+    bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300
+    border border-transparent
+    hover:border-brand-200 dark:hover:border-brand-500/20
+    hover:bg-brand-50 dark:hover:bg-brand-500/10
+    hover:text-brand-600 dark:hover:text-brand-400
+    transition-all duration-200 cursor-pointer;
+}
+.entity-pill:active {
+  transform: scale(0.97);
+}
+
+/* =====================================================
+   PROGRESS BAR
+===================================================== */
+.progress-bar {
+  @apply h-1.5 rounded-full overflow-hidden
+    bg-slate-100 dark:bg-slate-800;
+}
+.progress-bar-fill {
+  @apply h-full rounded-full
+    bg-gradient-to-r from-brand-500 via-purple-500 to-cyan-500
+    transition-all duration-500 ease-out;
+  background-size: 200% 100%;
+  animation: progress-shimmer 2s linear infinite;
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* =====================================================
+   ANIMATIONS
+===================================================== */
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-in { animation: modal-in 200ms ease-out forwards; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 300ms ease-out forwards; }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in { animation: scale-in 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.animate-pulse-soft { animation: pulse-soft 1.2s ease-in-out infinite; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow { animation: spin-slow 20s linear infinite; }
+
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Stagger children animation */
+.stagger-children > * {
+  opacity: 0;
+  animation: stagger-in 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 350ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(9) { animation-delay: 450ms; }
+
+/* =====================================================
+   CONFIDENCE GAUGE
+===================================================== */
+.gauge-ring {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+/* =====================================================
+   SHIMMER LOADING
+===================================================== */
+.shimmer {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(99, 102, 241, 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* =====================================================
+   GENERATION PIPELINE STAGES
+===================================================== */
+.pipeline-stage {
+  @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs
+    transition-all duration-300;
+}
+.pipeline-stage-active {
+  @apply bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-400
+    border border-brand-200 dark:border-brand-500/30;
+}
+.pipeline-stage-done {
+  @apply bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400
+    border border-emerald-200 dark:border-emerald-500/20;
+}
+.pipeline-stage-pending {
+  @apply text-slate-400 dark:text-slate-500 border border-transparent;
+}
+
+/* =====================================================
+   TOOLTIP
+===================================================== */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  background: #1e293b;
+  color: #e2e8f0;
+  margin-bottom: 4px;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+/* =====================================================
+   CUSTOM SCROLLBAR
+===================================================== */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.4);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
