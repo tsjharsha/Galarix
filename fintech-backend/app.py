@@ -78,6 +78,13 @@ def check_api_key():
     if request.method == 'OPTIONS' or (request.endpoint and request.endpoint == 'home'):
         return
 
+    # Allow requests directly from the Galarix Vercel frontend
+    origin = request.headers.get('Origin', '')
+    referer = request.headers.get('Referer', '')
+    if 'vercel.app' in origin or 'vercel.app' in referer or 'localhost:3000' in origin:
+        return
+
+
     provided_key = request.headers.get("X-API-Key") or request.args.get("api_key")
     
     # 1. Fallback to Master Key (if set in .env)
