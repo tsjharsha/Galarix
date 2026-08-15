@@ -333,10 +333,6 @@ def get_entity_provenance(entity: str):
 def stream():
     """
     Main streaming endpoint — prompt input via query parameter.
-
-    Note: In production, configure your reverse proxy with an
-    appropriate proxy_read_timeout (e.g. 60s in nginx) to prevent
-    hanging connections if the pipeline stalls.
     """
     prompt = request.args.get("prompt", "")
     region = request.args.get("region", "US")
@@ -345,7 +341,12 @@ def stream():
             "error": "Missing 'prompt' parameter",
             "usage": "/generate-stream?prompt=your_text&region=US",
         }), 400
-    return Response(generate_stream(prompt, region), mimetype="text/event-stream")
+        
+    response = Response(generate_stream(prompt, region), mimetype="text/event-stream")
+    response.headers["X-Accel-Buffering"] = "no"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Connection"] = "keep-alive"
+    return response
 
 
 @app.route("/analyze", methods=["POST"])
