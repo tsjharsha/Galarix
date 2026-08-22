@@ -25,7 +25,7 @@ SUPPORTED_ENTITIES = {
 }
 
 # Malicious or dangerous keywords that crash the math tensor
-POISON_KEYWORDS = ["nan", "null", "undefined", "infinity", "-inf", "inf"]
+POISON_KEYWORDS = ["nan", "undefined", "infinity", "-inf", "inf"]
 
 def validate_prompt(prompt: str) -> tuple[bool, str, str]:
     """
@@ -46,17 +46,20 @@ def validate_prompt(prompt: str) -> tuple[bool, str, str]:
         if re.search(rf"\b{poison}\b", clean_prompt):
             return False, "", f"Galarix Firewall: Detected restricted mathematical keyword '{poison}'. Please remove this to ensure statistical validity."
 
-    # 2. Entity Whitelist & Multi-Entity Megajoin Check
-    detected_entities = []
-    for entity_key, keywords in SUPPORTED_ENTITIES.items():
-        for kw in keywords:
-            if re.search(rf"\b{re.escape(kw)}\b", clean_prompt):
-                if entity_key not in detected_entities:
-                    detected_entities.append(entity_key)
-
-    if len(detected_entities) == 0:
-        return False, "", "Galarix Tier 2 currently optimizes generation for 20 core financial entities (e.g., Mortgages, Credit Cards, Payroll). Your request did not match a supported domain. Please try a different prompt."
-
+    # 2. Prompt Injection Guard (NEW)
+    INJECTION_PATTERNS = [
+        r"ignore\s+(previous|above|all)\s+(instructions|prompts)",
+        r"system\s*prompt",
+        r"you\s+are\s+now",
+        r"<script",
+        r"javascript:",
+        r"DROP\s+TABLE",
+        r";\s*DELETE",
+        r"UNION\s+SELECT",
+    ]
+    for pattern in INJECTION_PATTERNS:
+        if re.search(pattern, clean_prompt, re.IGNORECASE):
+            return False, "", "Galarix Firewall: Potentially unsafe input detected."
 
     # 3. Mathematical Contradiction Guard (Very basic heuristic for the demo)
     # The user specifically mentioned the "300 credit score with 500k limit" breaking the math.

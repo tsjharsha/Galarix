@@ -67,6 +67,7 @@ def weave_correlations(
     for spec in covariance_list:
         va, vb = spec.get("var_a", ""), spec.get("var_b", "")
         coeff = max(-0.99, min(0.99, spec.get("coefficient", 0.0)))
+        coeff = _compensate_small_n(coeff, n)
         if va in var_index and vb in var_index:
             i, j = var_index[va], var_index[vb]
             R[i, j] = coeff
@@ -100,12 +101,24 @@ def weave_correlations(
 
     for j, var_name in enumerate(corr_var_list):
         original_sorted = np.sort(data_matrix[:, j])
-        indices = np.round(correlated_uniform[:, j] * (n - 1)).astype(int)
-        indices = np.clip(indices, 0, n - 1)
-        columns[var_name] = original_sorted[indices]
+        # Use linear interpolation instead of index rounding to prevent discretization artifacts
+        u_vals = correlated_uniform[:, j]
+        emp_cdf = np.linspace(1e-5, 1 - 1e-5, n)
+        columns[var_name] = np.interp(u_vals, emp_cdf, original_sorted)
 
     return columns
 
+def _compensate_small_n(target_corr: float, n: int) -> float:
+    """
+    Inflate target correlation for small samples.
+    Cholesky copula undershoots on small N due to discretization.
+    """
+    if n >= 500:
+        return target_corr
+    # Empirical correction factor
+    inflation = 1.0 + (0.15 * (500 - n) / 500)
+    compensated = target_corr * min(inflation, 1.3)
+    return max(-0.99, min(0.99, compensated))
 
 def _is_continuous(arr: np.ndarray) -> bool:
     """Check if array is numeric and has variance."""

@@ -13,7 +13,9 @@ from groq import Groq
 # =====================================================
 
 from typing import Tuple
+from functools import lru_cache
 
+@lru_cache(maxsize=1000)
 def expand_prompt_agentically(raw_prompt: str) -> Tuple[str, bool]:
     """
     Acts as a 'brain' when the static keyword engine fails.

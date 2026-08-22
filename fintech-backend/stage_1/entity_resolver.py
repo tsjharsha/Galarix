@@ -32,6 +32,75 @@ from stage_1.constants import (
     MULTI_ENTITY_GAP,
 )
 
+SYNONYM_MAP = {
+    # Natural language → entity keywords
+    "buying": "transaction",
+    "purchasing": "transaction", 
+    "spending": "expense",
+    "grocery": "credit card",
+    "groceries": "credit card",
+    "shopping": "credit card",
+    "paying": "payment",
+    "paying back": "loan",
+    "emi": "loan",
+    "installment": "loan",
+    "borrowing": "loan",
+    "salary": "payroll",
+    "wages": "payroll",
+    "compensation": "payroll",
+    "rent": "expense",
+    "bills": "expense",
+    "transfer": "wire transfer",
+    "sending money": "wire transfer",
+    "stocks": "investment",
+    "shares": "investment",
+    "portfolio": "investment",
+    "trading": "options",
+    "travel": "credit card",
+    "dining": "credit card",
+    "restaurant": "credit card",
+    "online payment": "credit card",
+    "upi": "wire transfer",
+    "neft": "wire transfer",
+    "rtgs": "wire transfer",
+    "imps": "wire transfer",
+    "home loan": "mortgage",
+    "car loan": "loan",
+    "personal loan": "loan",
+    "education loan": "loan",
+    "claim": "insurance",
+    "premium": "insurance",
+    "coverage": "insurance",
+    "demat": "investment",
+    "mutual fund": "investment",
+    "sip": "investment",
+    "bitcoin": "crypto",
+    "ethereum": "crypto",
+    "nft": "crypto",
+    "blockchain": "crypto",
+    "subscription": "saas billing",
+    "recurring charge": "saas billing",
+    "refund": "credit card",
+    "chargeback": "credit card",
+    "atm cash": "atm withdrawal",
+    "cash withdrawal": "atm withdrawal",
+    "fraud": "aml",
+    "suspicious": "aml",
+    "money laundering": "aml",
+    "identity": "kyc",
+    "verification": "kyc",
+    "currency exchange": "forex",
+    "dollar to rupee": "forex",
+}
+
+def _expand_synonyms(prompt: str) -> str:
+    """Expand natural language synonyms into entity keywords."""
+    expanded = prompt.lower()
+    for synonym, keyword in SYNONYM_MAP.items():
+        if synonym in expanded:
+            expanded += f" {keyword}"
+    return expanded
+
 
 def resolve_entity(routed_input: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -66,7 +135,8 @@ def resolve_entity(routed_input: Dict[str, Any]) -> Dict[str, Any]:
 
         # ── LAYER 2 + 3: Keyword + Semantic scoring ──
         if prompt:
-            scores = _score_all_entities(prompt)
+            expanded_prompt = _expand_synonyms(prompt)
+            scores = _score_all_entities(expanded_prompt)
         else:
             scores = {e: 0.0 for e in SUPPORTED_ENTITIES}
 
@@ -79,11 +149,11 @@ def resolve_entity(routed_input: Dict[str, Any]) -> Dict[str, Any]:
         was_agentic = False
         agentic_offline = False
         if prompt and (not sorted_entities or sorted_entities[0][1] < MULTI_ENTITY_THRESHOLD):
-            expanded_prompt, is_offline = expand_prompt_agentically(prompt)
+            agentic_expanded_prompt, is_offline = expand_prompt_agentically(prompt)
             agentic_offline = is_offline
-            if expanded_prompt != prompt:
+            if agentic_expanded_prompt != prompt:
                 # Re-score with expanded prompt!
-                scores = _score_all_entities(expanded_prompt)
+                scores = _score_all_entities(_expand_synonyms(agentic_expanded_prompt))
                 sorted_entities = sorted(scores.items(), key=lambda x: x[1], reverse=True)
                 was_agentic = True
 

@@ -24,8 +24,15 @@ import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 import time
+import uuid
+import warnings
+import numpy as np
 from typing import Any, Dict
 from dotenv import load_dotenv
+
+# Suppress NumPy division-by-zero warnings globally
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+np.seterr(divide='ignore', invalid='ignore')
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -45,8 +52,27 @@ from stage_1_5.schema_registry import (
     entity_exists,
 )
 from stage_0_5.prompt_firewall import validate_prompt
+from flasgger import Swagger
 
 app = Flask(__name__)
+
+swagger_config = {
+    "headers": [],
+    "specs": [{
+        "endpoint": "apispec",
+        "route": "/api/docs/apispec.json",
+        "rule_filter": lambda rule: True,
+        "model_filter": lambda tag: True,
+    }],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/api/docs",
+    "title": "Galarix API",
+    "version": "5.0.0",
+    "description": "Behavior-Driven Synthetic Financial Data Engine",
+}
+swagger = Swagger(app, config=swagger_config)
+
 # Restrict CORS to allowed origins in production
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 CORS(app, origins=allowed_origins if allowed_origins != ["*"] else "*")
@@ -63,13 +89,26 @@ limiter = Limiter(
 API_KEY = os.getenv("GALARIX_API_KEY")
 
 # Initialize Firebase Admin
+firebase_env = os.getenv("FIREBASE_CREDENTIALS")
 cred_path = os.path.join(os.path.dirname(__file__), '.firebase-credentials.json')
-if os.path.exists(cred_path):
+
+if firebase_env:
+    # Production: Read from Environment Variable
+    try:
+        cred_dict = json.loads(firebase_env)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
+        db = firestore.client(database_id='galarixdb')
+    except Exception as e:
+        print(f"WARNING: Failed to parse FIREBASE_CREDENTIALS env var: {e}")
+        db = None
+elif os.path.exists(cred_path):
+    # Local Development: Read from file
     cred = credentials.Certificate(cred_path)
     firebase_admin.initialize_app(cred)
     db = firestore.client(database_id='galarixdb')
 else:
-    print("WARNING: .firebase-credentials.json not found! Dynamic API keys will not work.")
+    print("WARNING: Firebase credentials missing! Dynamic API keys will not work.")
     db = None
 
 def log_audit_event(endpoint: str, prompt: str, region: str, status: str = "success", error_msg: str = ""):
@@ -97,6 +136,9 @@ def log_audit_event(endpoint: str, prompt: str, region: str, status: str = "succ
 
 @app.before_request
 def enforce_https():
+    # Assign a unique request ID for tracing
+    request.request_id = str(uuid.uuid4())[:8]
+
     # Only enforce in production, allow localhost
     if not request.host.startswith('localhost') and not request.host.startswith('127.0.0.1'):
         if request.headers.get('X-Forwarded-Proto', 'http') == 'http':
@@ -402,6 +444,24 @@ def get_entity_provenance(entity: str):
         "provenance": provenance
     })
 
+@app.route("/health", methods=["GET"])
+def health():
+    """
+    Health check — used by load balancers and infrastructure to verify the service is alive.
+    ---
+    tags:
+      - System
+    responses:
+      200:
+        description: Returns system status and loaded configuration
+    """
+    return jsonify({
+        "status": "healthy",
+        "version": "5.0.0",
+        "engine": "GALARIX",
+        "entities": len(list_available_entities()),
+        "regions": 7,
+    })
 
 @app.route("/generate-stream")
 def stream():
@@ -424,16 +484,31 @@ def stream():
     response.headers["Connection"] = "keep-alive"
     return response
 
-
 @app.route("/analyze", methods=["POST"])
 def analyze():
     """
-    Non-streaming analysis endpoint.
-    Supports both prompt and structured input.
-
-    Body (JSON):
-        {"prompt": "text"}           → prompt mode
-        {"entity": "loans", ...}     → structured mode
+    Non-streaming analysis endpoint. Run the Stage 1 & 2 mathematical tensor.
+    ---
+    tags:
+      - Engine
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            prompt:
+              type: string
+              example: "high risk credit card fraud in texas"
+            region:
+              type: string
+              example: "US"
+    responses:
+      200:
+        description: Returns the full mathematical statistical contract model
+      400:
+        description: Invalid prompt or unsupported entity
     """
     data = request.get_json(silent=True) or {}
 
@@ -485,19 +560,35 @@ def analyze():
 @app.route("/generate", methods=["POST"])
 def generate():
     """
-    Full dataset generation endpoint.
-
-    Body (JSON):
-        {
-            "prompt": "high risk credit card fraud",
-            "rows": 5000,         // default: 1000, max: 100000
-            "format": "json",     // json | csv (default: json)
-            "variation": 0,       // salt for re-generation
-            "include_audit": true // include quality audit report
-        }
-
-    Returns:
-        Full dataset with audit report and metadata.
+    Full dataset generation endpoint. Run all 5 stages.
+    ---
+    tags:
+      - Engine
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            prompt:
+              type: string
+              example: "high risk credit card fraud"
+            rows:
+              type: integer
+              example: 1000
+            region:
+              type: string
+              example: "US"
+            format:
+              type: string
+              example: "json"
+            include_audit:
+              type: boolean
+              example: true
+    responses:
+      200:
+        description: Returns the full generated dataset and trust certificate
     """
     data = request.get_json(silent=True) or {}
     prompt = data.get("prompt", "")
