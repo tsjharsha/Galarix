@@ -72,23 +72,78 @@ else:
     print("WARNING: .firebase-credentials.json not found! Dynamic API keys will not work.")
     db = None
 
+def log_audit_event(endpoint: str, prompt: str, region: str, status: str = "success", error_msg: str = ""):
+    """Write an audit trail event for the generated data."""
+    if db is None:
+        return
+    try:
+        user_id = getattr(request, 'user_id', 'anonymous')
+        key_prefix = getattr(request, 'api_key_prefix', 'unknown')
+        
+        audit_data = {
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'user_id': user_id,
+            'api_key_prefix': key_prefix,
+            'endpoint': endpoint,
+            'prompt': prompt,
+            'region': region,
+            'status': status,
+            'ip_address': request.remote_addr,
+            'error': error_msg
+        }
+        db.collection('audit_logs').add(audit_data)
+    except Exception as e:
+        print(f"Failed to write audit log: {e}")
+
+@app.before_request
+def enforce_https():
+    # Only enforce in production, allow localhost
+    if not request.host.startswith('localhost') and not request.host.startswith('127.0.0.1'):
+        if request.headers.get('X-Forwarded-Proto', 'http') == 'http':
+            abort(403, description="HTTPS is strictly required. Please use https://")
+
+
+import hashlib
+
+def _hash_key(raw_key: str) -> str:
+    """SHA-256 hash an API key for secure storage comparison."""
+    return hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+
+ALLOWED_FRONTEND_ORIGINS = [
+    os.getenv("FRONTEND_URL", "https://galarix.vercel.app"),
+    "http://localhost:3000",
+]
+
 @app.before_request
 def check_api_key():
     # Allow CORS preflight and public home route
     if request.method == 'OPTIONS' or (request.endpoint and request.endpoint == 'home'):
         return
 
-    # Allow requests directly from the Galarix Vercel frontend
     origin = request.headers.get('Origin', '')
-    referer = request.headers.get('Referer', '')
-    if 'vercel.app' in origin or 'vercel.app' in referer or 'localhost:3000' in origin:
-        return
+    
+    # Frontend requests: verify Firebase ID token instead of origin string
+    if origin in ALLOWED_FRONTEND_ORIGINS:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            id_token = auth_header.split('Bearer ')[1]
+            try:
+                from firebase_admin import auth
+                decoded = auth.verify_id_token(id_token)
+                request.user_id = decoded['uid']
+                request.api_key_prefix = 'frontend_user'
+                return
+            except Exception:
+                abort(401, description="Invalid authentication token.")
+        abort(401, description="Authentication required.")
 
-
+    # API key flow (for programmatic access)
     provided_key = request.headers.get("X-API-Key") or request.args.get("api_key")
     
     # 1. Fallback to Master Key (if set in .env)
     if API_KEY and provided_key == API_KEY:
+        request.user_id = 'master_admin'
+        request.api_key_prefix = 'master_key'
         return
         
     # 2. Verify dynamic key against Firestore
@@ -100,11 +155,30 @@ def check_api_key():
         
     try:
         keys_ref = db.collection('api_keys')
-        query = keys_ref.where('key', '==', provided_key).limit(1)
+        hashed_key = _hash_key(provided_key)
+        query = keys_ref.where('key_hash', '==', hashed_key).limit(1)
         results = list(query.stream())
         
         if len(results) > 0:
-            # Valid key found
+            key_doc = results[0]
+            key_data = key_doc.to_dict()
+            
+            # Check usage limits
+            tier = key_data.get("tier", "free")
+            usage = key_data.get("usage_count", 0)
+            
+            TIER_LIMITS = {"free": 100, "starter": 1000, "pro": 10000, "enterprise": 100000}
+            if usage >= TIER_LIMITS.get(tier, 100):
+                abort(429, description=f"API key usage limit exceeded for '{tier}' tier.")
+                
+            # Update usage tracking
+            key_doc.reference.update({
+                "usage_count": firestore.Increment(1),
+                "last_used": firestore.SERVER_TIMESTAMP,
+            })
+            
+            request.user_id = key_data.get('user_id', 'unknown_api_user')
+            request.api_key_prefix = key_data.get('key_prefix', 'unknown_prefix')
             return
             
     except Exception as e:
@@ -337,11 +411,13 @@ def stream():
     prompt = request.args.get("prompt", "")
     region = request.args.get("region", "US")
     if not prompt:
+        log_audit_event("/generate-stream", "", region, status="error", error_msg="Missing prompt")
         return jsonify({
             "error": "Missing 'prompt' parameter",
             "usage": "/generate-stream?prompt=your_text&region=US",
         }), 400
         
+    log_audit_event("/generate-stream", prompt, region, status="started")
     response = Response(generate_stream(prompt, region), mimetype="text/event-stream")
     response.headers["X-Accel-Buffering"] = "no"
     response.headers["Cache-Control"] = "no-cache"
@@ -366,9 +442,13 @@ def analyze():
     elif data:
         raw_input = data
     else:
+        log_audit_event("/analyze", "", "US", status="error", error_msg="Missing body")
         return jsonify({
             "error": "Missing request body. Send JSON with 'prompt' or structured fields."
         }), 400
+
+    region = data.get("region", "US")
+    log_audit_event("/analyze", str(raw_input), region, status="started")
 
     try:
         if isinstance(raw_input, str):
@@ -425,10 +505,14 @@ def generate():
     include_audit = data.get("include_audit", True)
 
     if not prompt:
+        log_audit_event("/generate", "", "US", status="error", error_msg="Missing prompt")
         return jsonify({
             "status": "error",
             "message": "Missing 'prompt' field. Send JSON with a 'prompt' string.",
         }), 400
+
+    region = data.get("region", "US")
+    log_audit_event("/generate", prompt, region, status="started")
 
     try:
         is_valid, safe_prompt, error_msg = validate_prompt(prompt)
@@ -513,9 +597,11 @@ def trust_report():
     Returns:
         Full trust certificate with regional validation.
     """
-    data = request.get_json(silent=True) or {}
-    prompt = data.get("prompt", "")
+    data = request.json or {}
+    prompt = data.get("prompt")
     region = data.get("region", "US")
+    
+    log_audit_event("/trust-report", prompt or str(data), region, status="started")
     rows = max(100, min(data.get("rows", 1000), 100000))
     variation = data.get("variation", 0)
     output_format = data.get("format", "json")

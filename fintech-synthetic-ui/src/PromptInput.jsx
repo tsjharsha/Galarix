@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { fetchEventSource } from "@microsoft/fetch-event-source";
+import { getAuth } from "firebase/auth";
 import { usePromptHistory } from "./context/PromptHistoryContext";
 import DataDashboard from "./components/DataDashboard";
 import { 
@@ -65,67 +67,89 @@ function PromptInput({
     setPrompt("");
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-    const eventSource = new EventSource(
-      `${backendUrl}/generate-stream?prompt=${encodeURIComponent(prompt)}&region=${region}`
-    );
+    const url = `${backendUrl}/generate-stream?prompt=${encodeURIComponent(prompt)}&region=${region}`;
 
-    eventSource.onmessage = (event) => {
-      const payload = JSON.parse(event.data);
+    const auth = getAuth();
+    const user = auth.currentUser;
+    const idToken = user ? await user.getIdToken() : null;
 
-      if (payload.error) {
-        eventSource.close();
-        setIsGenerating(false);
-        audioKinetics.stopEngineHum();
-        audioKinetics.playLockdownThud();
-        
-        // Trigger shake
-        setIsShaking(true);
-        setTimeout(() => setIsShaking(false), 500);
-
-        // Firewall Rejection as chat message
-        addMessageToThread(threadId, {
-          role: "assistant",
-          type: "error",
-          content: payload.message || "Request rejected by Galarix Firewall.",
-          time: new Date().toLocaleString()
-        });
-        return;
-      }
-
-      if (payload.progress !== undefined) {
-        setProgress(payload.progress);
-        if (payload.progress < 20) setStatusMessage("Routing input...");
-        else if (payload.progress < 50) setStatusMessage("Resolving entities & intent...");
-        else if (payload.progress < 85) setStatusMessage("Enriching schema...");
-        else if (payload.progress < 95) setStatusMessage("Compiling statistical model...");
-        else setStatusMessage("Finalizing...");
-        return;
-      }
-
-      if (payload.done) {
-        setIsGenerating(false);
-        audioKinetics.stopEngineHum();
-        addAIResponseToThread(threadId, payload);
-        eventSource.close();
-      }
+    const headers = {
+      'Content-Type': 'application/json',
     };
+    if (idToken) {
+      headers['Authorization'] = `Bearer ${idToken}`;
+    }
 
-    eventSource.onerror = () => {
-      eventSource.close();
-      setIsGenerating(false);
-      audioKinetics.stopEngineHum();
-      audioKinetics.playLockdownThud();
-      
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 500);
+    const abortController = new AbortController();
 
-      addMessageToThread(threadId, {
-        role: "assistant",
-        type: "error",
-        content: "Network error: Failed to connect to Galarix Engine.",
-        time: new Date().toLocaleString()
+    try {
+      await fetchEventSource(url, {
+        method: 'GET',
+        headers: headers,
+        signal: abortController.signal,
+        onmessage(event) {
+          try {
+            const payload = JSON.parse(event.data);
+
+            if (payload.error) {
+              abortController.abort();
+              setIsGenerating(false);
+              audioKinetics.stopEngineHum();
+              audioKinetics.playLockdownThud();
+              
+              setIsShaking(true);
+              setTimeout(() => setIsShaking(false), 500);
+
+              addMessageToThread(threadId, {
+                role: "assistant",
+                type: "error",
+                content: payload.message || "Request rejected by Galarix Firewall.",
+                time: new Date().toLocaleString()
+              });
+              return;
+            }
+
+            if (payload.progress !== undefined) {
+              setProgress(payload.progress);
+              if (payload.progress < 20) setStatusMessage("Routing input...");
+              else if (payload.progress < 50) setStatusMessage("Resolving entities & intent...");
+              else if (payload.progress < 85) setStatusMessage("Enriching schema...");
+              else if (payload.progress < 95) setStatusMessage("Compiling statistical model...");
+              else setStatusMessage("Finalizing...");
+              return;
+            }
+
+            if (payload.done) {
+              setIsGenerating(false);
+              audioKinetics.stopEngineHum();
+              addAIResponseToThread(threadId, payload);
+              abortController.abort();
+            }
+          } catch (e) {
+            console.error("Error parsing SSE data", e);
+          }
+        },
+        onerror(err) {
+          abortController.abort();
+          setIsGenerating(false);
+          audioKinetics.stopEngineHum();
+          audioKinetics.playLockdownThud();
+          
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 500);
+
+          addMessageToThread(threadId, {
+            role: "assistant",
+            type: "error",
+            content: "Network error: Failed to connect to Galarix Engine.",
+            time: new Date().toLocaleString()
+          });
+          throw err;
+        }
       });
-    };
+    } catch (error) {
+      console.error("SSE Fetch Error:", error);
+    }
   };
 
   return (
